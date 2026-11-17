@@ -1,0 +1,12 @@
+# Archivos del sistema y de herramientas
+.DS_Store
+.claude/
+
+# Datos crudos descargados: se regeneran con `node scripts/descargar_datos.js`.
+# No se publican porque las huertas traen direcciones de casas particulares.
+data/*.geojson
+!data/area_juego.geojson
+data/preview.html
+
+# Copia original del polígono (el juego usa data/area_juego.geojson)
+/area_juego.geojson

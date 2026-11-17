@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Flores del Barrio</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#2b1d0e;--cream:#f6ecd0;--cream2:#e6d6ad;--green:#3d8f45;--bg:#18261c;--accent:#e2574c}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--cream);
+    font-family:'Press Start 2P',ui-monospace,Menlo,monospace;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+  #app{width:min(100vw,900px,calc((100vh - 70px)*4/3));min-width:280px;margin:0 auto;padding:6px 0}
+  #screen{position:relative;border:4px solid var(--ink);box-shadow:0 0 0 4px #0d150f;background:#dfeecb;line-height:0;overflow:hidden}
+  #game{width:100%;aspect-ratio:4/3;display:block;touch-action:none;cursor:pointer}
+  .box{background:var(--cream);color:var(--ink);border:4px solid var(--ink);box-shadow:inset 0 0 0 3px var(--cream2)}
+  #hud{position:absolute;left:0;right:0;top:0;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:6px 8px;
+    background:rgba(24,38,28,.9);font-size:8px;line-height:1.5;z-index:2}
+  #hud b{color:#ffe27a;font-weight:normal}
+  #hud .neg{color:#ff8a80}
+  #hud i{display:inline-block;width:8px;height:8px;margin-right:3px;vertical-align:-1px}
+  #hud .sp{flex:1}
+  #dia{position:absolute;left:0;bottom:-3px;height:3px;background:#ffe27a}
+  #mini{position:absolute;right:6px;top:34px;width:36%;border:2px solid #0d150f;opacity:.94;z-index:1;image-rendering:auto}
+  #place{position:absolute;left:6px;top:34px;padding:5px 7px;font-size:8px;line-height:1.4;background:rgba(24,38,28,.82);color:var(--cream);border:2px solid #0d150f;display:none;max-width:56%;z-index:1}
+  #toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);padding:8px 10px;font-size:8px;line-height:1.6;display:none;z-index:3;text-align:center;max-width:90%}
+  #dialog{position:absolute;left:8px;right:8px;bottom:8px;padding:12px;font-size:9px;line-height:1.8;display:none;z-index:4}
+  #dialog b{color:var(--accent);display:block;margin-bottom:4px}
+  #panel{position:absolute;left:8px;right:8px;bottom:8px;padding:10px 12px;font-size:8px;line-height:1.7;display:none;z-index:3;max-height:62%;overflow:auto}
+  #panel h3{font-size:10px;margin:0 22px 6px 0;color:var(--accent)}
+  #panel p{margin:4px 0}
+  #panel .x{position:absolute;right:6px;top:4px;background:none;border:0;font-size:12px;color:var(--ink);padding:4px}
+  #panel .fila{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  #panel .fila .btn{flex:1 1 30%;margin:0}
+  .barra{height:8px;background:#cdbb98;border:2px solid var(--ink);margin:6px 0}
+  .barra div{height:100%;background:var(--green)}
+  button{font-family:inherit;cursor:pointer}
+  .btn{display:block;width:100%;margin-top:6px;padding:9px 6px;font-size:8px;line-height:1.5;background:var(--green);color:#fff;
+    border:3px solid var(--ink);box-shadow:inset -3px -3px 0 rgba(0,0,0,.25);touch-action:manipulation}
+  .btn.alt{background:var(--cream2);color:var(--ink)}
+  .btn:disabled{background:#b9ab84;color:#7a6f55;cursor:default;box-shadow:none}
+  .btn canvas{width:40px;height:40px;display:block;margin:0 auto 4px;image-rendering:auto}
+  #hint{font-size:7px;color:#8fa893;text-align:center;line-height:1.8;padding:6px}
+  .overlay{position:fixed;inset:0;background:rgba(10,18,12,.82);display:none;align-items:center;justify-content:center;padding:12px;z-index:9}
+  #card{width:min(340px,100%);max-height:96vh;overflow:auto;padding:16px;text-align:center;font-size:9px;line-height:1.8}
+  #card h2{font-size:12px;margin:10px 0 2px;line-height:1.5}
+  #card em{font-family:Georgia,serif;font-size:13px;color:#6b5a3c}
+  #card p{margin:10px 0}
+  .pics{display:flex;gap:12px;justify-content:center;align-items:center}
+  .pic{width:112px;height:112px;border:4px solid var(--ink)}
+  #cardSprite{width:168px;height:168px;background:#f3ead2;padding:4px}
+  #cardPhoto{display:none;object-fit:cover;image-rendering:pixelated}
+  #cardStatus{color:var(--green)}
+  #albumBox{width:min(560px,100%);max-height:92vh;display:flex;flex-direction:column;padding:14px;font-size:9px}
+  #albumBox h2{font-size:12px;margin:2px 0 4px;text-align:center}
+  #albumSub{text-align:center;color:#6b5a3c;font-size:8px;margin-bottom:10px;line-height:1.6}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;overflow:auto;flex:1;min-height:0}
+  .cell{background:#fff8e2;border:3px solid var(--ink);padding:8px 4px;text-align:center;font-size:7px;line-height:1.6;cursor:pointer}
+  .cell canvas{width:64px;height:64px;display:block;margin:0 auto 6px}
+  .cell small{display:block;color:#8a7f66;font-size:6px}
+  .cell.no{background:#ddd0aa;color:#8a7f66;cursor:default}
+  .cell.no .q{width:64px;height:64px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#b9ab84}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="screen">
+    <canvas id="game" width="960" height="720"></canvas>
+    <div id="hud"></div>
+    <div id="place"></div>
+    <canvas id="mini"></canvas>
+    <div id="toast" class="box"></div>
+    <div id="panel" class="box"></div>
+    <div id="dialog" class="box"></div>
+  </div>
+  <div id="hint">Toca el mapa para caminar · Toca tu casa, la tienda, una paca, una huerta o un reciclador para actuar · También sirven las flechas y Espacio<br>Datos: Jardín Botánico de Bogotá, IDRD y © colaboradores de OpenStreetMap</div>
+</div>
+
+<div class="overlay" id="cardOv">
+  <div class="box" id="card">
+    <div class="pics">
+      <canvas class="pic" id="cardSprite" width="16" height="16"></canvas>
+      <img class="pic" id="cardPhoto" alt="Tu foto">
+    </div>
+    <h2 id="cardName"></h2>
+    <em id="cardSci"></em>
+    <p id="cardFact"></p>
+    <div id="cardStatus"></div>
+    <button class="btn" id="btnFoto">REGISTRAR CON FOTO</button>
+    <button class="btn alt" id="btnReg">REGISTRAR SIN FOTO</button>
+    <button class="btn alt" id="btnClose">CERRAR</button>
+    <input type="file" id="file" accept="image/*" capture="environment" hidden>
+  </div>
+</div>
+
+<div class="overlay" id="albumOv">
+  <div class="box" id="albumBox">
+    <h2>ÁRBOLES DEL BARRIO</h2>
+    <div id="albumSub"></div>
+    <div id="grid"></div>
+    <button class="btn alt" id="btnAlbumClose">CERRAR</button>
+  </div>
+</div>
+
+<script src="data/mapa.js"></script>
+<script>
+if(!window.MAPA||!MAPA.calles){ document.body.innerHTML='<p style="padding:24px;line-height:2">Falta data/mapa.js. Ejecuta:<br>node scripts/descargar_datos.js<br>node scripts/construir_mapa.js</p>'; throw new Error('sin mapa'); }
+</script>
+<script src="especies.js"></script>
+<script src="juego.js"></script>
+</body>
+</html>
