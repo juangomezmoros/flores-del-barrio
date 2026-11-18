@@ -139,7 +139,8 @@ const parH=parPts(MAPA.huertas); { let n=0; for(const [x,y] of parH) if(enArea(x
 { let n=1; for(let i=0;i<MAPA.recicladores.length;i+=2){ const x=MAPA.recicladores[i], y=MAPA.recicladores[i+1]; if(separado(x,y,20)){ poner('r'+n,'rec',x,y); n++; } } }
 { const cand=[]; MAPA.edificios.forEach(p=>{ let x=0,y=0; for(let i=0;i<p.length;i+=2){ x+=p[i]; y+=p[i+1]; } x/=p.length/2; y/=p.length/2; if(enArea(x,y)) cand.push([x,y]); });
   cand.sort((a,b)=>dC(...a)-dC(...b)); let n=0;
-  for(const [x,y] of cand){ if(n>=VECINOS.length) break; if(dC(x,y)<25||!separado(x,y,18)) continue;
+  const TI=SITIOS.tienda; // deja libre el frente de la tienda, donde están las cosas para comprar
+  for(const [x,y] of cand){ if(n>=VECINOS.length) break; if(dC(x,y)<25||!separado(x,y,18)||(TI&&Math.hypot(x-TI.x,y-TI.y-13)<30)) continue;
     if(Object.values(SITIOS).some(s=>s.t==='vecino'&&Math.hypot(s.x-x,s.y-y)<40)) continue; poner('v'+n,'vecino',x,y,n); n++; } }
 const LISTA=Object.values(SITIOS);
 
@@ -174,8 +175,31 @@ const CONSTRUIDO_EN={}; SEQ.forEach((p,i)=>{ if(p.tipo==='construir') CONSTRUIDO
 const hecho=id=>id==='casa'||SITIOS[id].t==='casera'||!!S.hechos[CONSTRUIDO_EN[id]];
 const nivelDe=id=>S.nivel[id]||0;
 const radio=()=>RADIOS[S.zona]||RADIOS[RADIOS.length-1];
-const proximos=()=>{ const r=[]; for(let i=0;i<SEQ.length&&r.length<2;i++) if(!S.hechos[i]){ const p=SEQ[i];
+const DE_TIENDA={carrito:1,bici:1,sombrero:1};
+const proximos=()=>{ const r=[]; for(let i=0;i<SEQ.length&&r.length<2;i++) if(!S.hechos[i]&&!DE_TIENDA[SEQ[i].tipo]){ const p=SEQ[i];
     if(r.length===1&&dC(p.x,p.y)>radio()) break; r.push(i); } return r; };
+// La tienda: siempre muestra lo siguiente que se puede comprar de cada cosa
+const PRECIO_CARRITO=[0,150,900], PRECIO_BICI=300, PRECIO_SOMBRERO={gorra:120,paja:300,vueltiao:700}, ICO_SOMBRERO={gorra:'🧢',paja:'👒',vueltiao:'🎩'};
+function padsTienda(){ if(!hecho('tienda')) return []; const r=[], n=(S.carrito||0)+1;
+  if(n<CAPACIDAD.length) r.push({k:'tc'+n,tipo:'carrito',n,costo:PRECIO_CARRITO[n],...enTienda(-13),ico:'🛒'});
+  if(!S.bici) r.push({k:'tb',tipo:'bici',costo:PRECIO_BICI,...enTienda(0),ico:'🚲'});
+  const h=SOMBREROS.find(o=>!S.sombreros[o.id]); if(h) r.push({k:'ts'+h.id,tipo:'sombrero',h:h.id,costo:PRECIO_SOMBRERO[h.id],...enTienda(13),ico:ICO_SOMBRERO[h.id]});
+  return r; }
+const pads=()=>proximos().map(i=>({k:i,...SEQ[i]})).concat(padsTienda());
+// Qué es cada cosa que se puede construir o comprar
+function infoPad(p){ const s=p.s&&SITIOS[p.s];
+  if(p.tipo==='construir') return {paca:['Paca digestora','Echa aquí los orgánicos. Cuando se llena, da flores y tierra.'],
+    huerta:['Huerta comunitaria','Trae tierra de las pacas para sembrar, y cosecha.'],
+    rec:['Reciclador','Te compra el reciclaje que le lleves.'],
+    vecino:['Casa de '+(s?VECINOS[s.i%VECINOS.length][0]:''),'Saca bolsas cada día y te paga por recogerlas.'],
+    tienda:['Tienda del barrio','Vende carritos, bicicleta y sombreros.']}[s.t];
+  if(p.tipo==='nivel'){ const paca_=s.t==='paca';
+    return ['Mejorar '+(paca_?'paca':'huerta')+' a nivel '+(p.n+1),'Crece más rápido y da más. '+(paca_?(p.n===1?'Caben 2 flores y salen flores nuevas.':'Salen las flores más valiosas.'):(p.n===1?'Se puede sembrar fresa y tomate.':'Se puede sembrar maíz y ahuyama.'))]; }
+  if(p.tipo==='carrito') return [p.n===1?'Carrito grande':'Remolque de carga','Cargas '+CAPACIDAD[p.n]+' bolsas en vez de '+CAPACIDAD[p.n-1]+'.'];
+  if(p.tipo==='bici') return ['Bicicleta de carga','Te mueves mucho más rápido.'];
+  if(p.tipo==='sombrero') return [SOMBREROS.find(o=>o.id===p.h).n,'Para verte bien en el barrio.'];
+  return ['Abrir más barrio','Llegas a calles nuevas con más vecinos, pacas y huertas.']; }
+const NOMBRE_SITIO=s=>({casa:'TU CASA',tienda:'TIENDA',rec:'RECICLADOR',paca:'PACA',huerta:'HUERTA',casera:'HUERTA CASERA',vecino:(VECINOS[s.i%VECINOS.length]||[''])[0].toUpperCase()})[s.t];
 
 // Estado de cada sitio (se crea cuando se construye)
 const paca=id=>S.pacas[id]||(S.pacas[id]={kg:0,s:[],tierra:0});
@@ -268,11 +292,11 @@ function actuar(s){
       if(h.tierra>=CULTIVOS[h.prox].tierra){ h.tierra=0; h.c=h.prox; h.t=0; } } }
 }
 // Pagar una construcción: te paras encima y la plata se va gastando
-function pagar(i,dt){ const p=SEQ[i], ya=S.pagado[i]||0;
+function pagar(p,dt){ const i=p.k, ya=S.pagado[i]||0;
   if(p.costo>0){ const falta=p.costo-ya; if(S.monedas<=0) return; const v=Math.min(falta,S.monedas,Math.max(1,Math.ceil(Math.max(40,p.costo/1.2)*dt)));
     S.monedas-=v; S.pagado[i]=ya+v; if(Math.random()<.5) volar(pl.x,pl.y-12,p.x,p.y,'$'); if(S.pagado[i]<p.costo) return; }
   else { S.pagado[i]=ya-dt; if(S.pagado[i]>-.35) return; }   // lo gratis se construye con solo pararse un momento
-  S.hechos[i]=1; delete S.pagado[i];
+  if(typeof i==='number') S.hechos[i]=1; delete S.pagado[i];
   if(p.tipo==='construir'){ const s=SITIOS[p.s]; if(s.t==='huerta') huerta(s.id).prox=elegirCultivo(s.id); flotar(s.x,s.y-20,'¡Listo!','#9cff9c'); }
   else if(p.tipo==='nivel'){ S.nivel[p.s]=p.n; flotar(p.x,p.y-20,'¡Nivel '+(p.n+1)+'!','#9cff9c'); }
   else if(p.tipo==='carrito'){ S.carrito=p.n; flotar(p.x,p.y-20,'+'+CAPACIDAD[p.n]+' bolsas','#9cff9c'); }
@@ -286,6 +310,7 @@ function objetivo(){
   const prox=proximos(), cerca=(lista)=>lista.reduce((m,s)=>!m||Math.hypot(s.x-pl.x,s.y-pl.y)<Math.hypot(m.x-pl.x,m.y-pl.y)?s:m,null);
   const activos=t=>LISTA.filter(s=>s.t===t&&hecho(s.id)&&dC(s.x,s.y)<=radio());
   for(const i of prox){ const p=SEQ[i]; if(S.monedas>=Math.max(0,p.costo-Math.max(0,S.pagado[i]||0))) return p; }
+  const carro=padsTienda().find(p=>p.tipo==='carrito'); if(carro&&S.carga.length>=capacidad()&&S.monedas>=carro.costo) return carro;
   const listas=[...activos('paca').filter(s=>pacaLista(paca(s.id))||paca(s.id).tierra>0&&S.carga.length<capacidad()),
     ...activos('huerta').filter(s=>{ const h=huerta(s.id); return h.c>=0&&h.t>=CULTIVOS[h.c].seg; })];
   if(listas.length) return cerca(listas);
@@ -321,7 +346,7 @@ function update(dt){
   } else { pl.step=0; quieto+=dt; }
   // acciones automáticas cada 0,12 s con los sitios cercanos
   tic+=dt; if(tic>=.12){ tic=0; LISTA.forEach(s=>{ if(hecho(s.id)&&Math.hypot(s.x-pl.x,s.y+3-pl.y)<9) actuar(s); }); }
-  proximos().forEach(i=>{ const p=SEQ[i]; if(Math.hypot(p.x-pl.x,p.y-pl.y)<4.5) pagar(i,dt); });
+  pads().forEach(p=>{ if(Math.hypot(p.x-pl.x,p.y-pl.y)<4.5) pagar(p,dt); });
   vuelos.forEach(v=>v.t+=dt/.3); for(let i=vuelos.length-1;i>=0;i--) if(vuelos[i].t>=1) vuelos.splice(i,1);
   textos.forEach(v=>v.t+=dt); for(let i=textos.length-1;i>=0;i--) if(textos[i].t>=1.2) textos.splice(i,1);
 }
@@ -340,7 +365,14 @@ function anillo(x,y,f){ ctx.lineWidth=5; ctx.strokeStyle='#2b1d0e'; ctx.beginPat
   ctx.strokeStyle='#58d858'; ctx.beginPath(); ctx.arc(x,y,11,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,f)); ctx.stroke(); }
 function estrellas(x,y,n){ for(let i=0;i<n;i++){ const ex=x-n*7+i*14; ctx.fillStyle='#2b1d0e'; ctx.fillRect(ex,y,12,12); ctx.fillStyle='#ffd23f'; ctx.fillRect(ex+2,y+2,8,8); ctx.fillStyle='#fff3a8'; ctx.fillRect(ex+3,y+3,3,3); } }
 
-function dibujarPad(i){ const p=SEQ[i], x=X(p.x), y=Y(p.y), f=p.costo?Math.min(1,(S.pagado[i]||0)/p.costo):Math.min(1,-(S.pagado[i]||0)/.35), enc=Math.hypot(p.x-pl.x,p.y-pl.y)<4.5;
+function fantasma(s,x,y){ ctx.globalAlpha=.38;
+  if(s.t==='paca') ctx.drawImage(PACA[0],x-33,y-40,66,48); else if(s.t==='huerta') ctx.drawImage(HUERTA,x-33,y-34,66,42);
+  else if(s.t==='rec'){ ctx.drawImage(CARRETA,x+6,y-34,48,36); ctx.drawImage(persona(RECI,'down',0),x-22,y-52,36,51); }
+  else if(s.t==='vecino') ctx.drawImage(CASAS_VEC[s.i%CASAS_VEC.length],x-39,y-70,78,78); else if(s.t==='tienda') ctx.drawImage(TIENDA,x-45,y-70,90,78);
+  ctx.globalAlpha=1; }
+function dibujarPad(p){ const i=p.k, x=X(p.x), y=Y(p.y), f=p.costo?Math.min(1,(S.pagado[i]||0)/p.costo):Math.min(1,-(S.pagado[i]||0)/.35), enc=Math.hypot(p.x-pl.x,p.y-pl.y)<4.5;
+  if(p.tipo==='construir') fantasma(SITIOS[p.s],x,y-4);
+  etiquetaTexto(infoPad(p)[0].toUpperCase(),x,y-(p.tipo==='construir'?78:30),7,'#ffe27a');
   if(p.tipo==='construir'){ ctx.setLineDash([8,6]); ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.beginPath(); ctx.roundRect(x-40,y-34,80,44,10); ctx.stroke(); ctx.setLineDash([]); }
   const s=enc?40:36; ctx.save(); ctx.translate(x,y);
   ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.roundRect(-s/2+2,-s/2+4,s,s,8); ctx.fill();
@@ -351,7 +383,9 @@ function dibujarPad(i){ const p=SEQ[i], x=X(p.x), y=Y(p.y), f=p.costo?Math.min(1
   ctx.restore();
   etiquetaTexto(p.costo?'$'+Math.max(0,p.costo-(S.pagado[i]>0?S.pagado[i]:0)):'GRATIS',x,y+11,9,'#fff'); }
 
-function dibujarSitio(s){ const x=X(s.x), y=Y(s.y), id=s.id;
+function dibujarSitio(s){ const f=dibujarSitio_(s); if(Math.hypot(s.x-pl.x,s.y-pl.y)>22) return f; const x=X(s.x), y=Y(s.y);
+  return ()=>{ if(f) f(); etiquetaTexto(NOMBRE_SITIO(s),x,y+(s.t==='paca'||s.t==='huerta'?34:24),7,'#fff'); }; }
+function dibujarSitio_(s){ const x=X(s.x), y=Y(s.y), id=s.id;
   if(s.t==='casa'){ ctx.drawImage(CASA,x-39,y-66,78,78); const nb=Math.min(6,S.casa.b); for(let k=0;k<nb;k++) ctx.drawImage(ICON.b,x+36+(k%3)*12,y-10-Math.floor(k/3)*12,14,16);
     const n=S.casa.o+S.casa.r; if(n) return ()=>globo(x,y-80,S.casa.o?ICON.o:ICON.r,n); return; }
   if(s.t==='vecino'){ const v=vecino(id); ctx.drawImage(CASAS_VEC[s.i%CASAS_VEC.length],x-39,y-66,78,78);
@@ -439,7 +473,7 @@ function draw(dt){
   ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#9aa0a8';
   MAPA.rotulos.forEach(r=>{ const x=X(r.x), y=Y(r.y); if(x<-80||y<-80||x>VW+80||y>VH+80) return;
     if(r.v){ ctx.save(); ctx.translate(x,y); ctx.rotate(-Math.PI/2); ctx.fillText(r.n,0,0); ctx.restore(); } else ctx.fillText(r.n,x,y); });
-  const prox=proximos();
+  const losPads=pads();
   // todo lo que va encima, ordenado de arriba a abajo
   const ents=[], vis=(x,y)=>X(x)>-100&&X(x)<VW+100&&Y(y)>-140&&Y(y)<VH+80;
   arbolesEn(cam.x-8,cam.y-4,cam.x+VW/PXM+8,cam.y+VH/PXM+12,k=>ents.push({y:AR[k+1],k}));
@@ -455,7 +489,7 @@ function draw(dt){
     else ctx.drawImage(ESPECIES[AR[e.k+2]].mini,X(AR[e.k])-16,Y(AR[e.k+1])-44,32,48);
   }
   dibujarNoche();
-  prox.forEach(dibujarPad);   // los cuadros para construir van encima de los árboles para que siempre se vean
+  losPads.forEach(dibujarPad);   // los cuadros para construir van encima de los árboles para que siempre se vean
   post.forEach(f=>f());
   vuelos.forEach(v=>{ const t=v.t, x=X(v.ax+(v.bx-v.ax)*t), y=Y(v.ay+(v.by-v.ay)*t)-Math.sin(t*Math.PI)*24;
     if(v.ico==='$'){ ctx.fillStyle='#2b1d0e'; ctx.fillRect(x-8,y-5,16,10); ctx.fillStyle='#58b868'; ctx.fillRect(x-7,y-4,14,8); ctx.fillStyle='#2e7d32'; ctx.fillRect(x-2,y-2,4,4); }
@@ -473,8 +507,16 @@ function loop(ts){ const dt=Math.min(.05,(ts-last)/1000||0); last=ts; time+=dt; 
   hudT+=dt; if(hudT>.15){ hudT=0; hud(); } requestAnimationFrame(loop); }
 
 // ======================= INTERFAZ =======================
-function hud(){ $('pMon').textContent='$'+S.monedas; $('pCarga').textContent=S.carga.length+'/'+capacidad();
+function hud(){ tarjeta(); $('pMon').textContent='$'+S.monedas; $('pCarga').textContent=S.carga.length+'/'+capacidad();
   $('pCam').textContent=nocheCamion()?'hoy':'mañana'; const n=oscuridad()>.3; $('pDia').textContent=(n?'🌙 ':'☀️ ')+'Día '+S.dia; }
+let infoK=null;
+function tarjeta(){ let m=null, md=14; pads().forEach(p=>{ const d=Math.hypot(p.x-pl.x,p.y-pl.y); if(d<md){ md=d; m=p; } });
+  const e=$('info'); if(!m||paused){ e.style.display='none'; infoK=null; return; }
+  const [t,d]=infoPad(m), falta=Math.max(0,m.costo-Math.max(0,S.pagado[m.k]||0));
+  $('infoIco').textContent=m.ico; $('infoT').textContent=t; $('infoD').textContent=d;
+  $('infoC').textContent=m.costo?'$'+falta:'GRATIS'; $('infoC').className=S.monedas>=falta?'ok':'';
+  $('infoP').textContent=md<4.5?'':(S.monedas>=falta?'Párate en el cuadro':'Te faltan $'+(falta-S.monedas));
+  e.style.display='flex'; infoK=m.k; }
 let toastT=0; function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>e.style.display='none',3500); }
 
 // Joystick: arrastra el dedo en cualquier parte. Un toque corto sobre un árbol abre su ficha.
