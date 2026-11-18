@@ -1,17 +1,19 @@
 // ======================= REGLAS DEL JUEGO (para ajustar fácil) =======================
-const DIA=20;                  // segundos reales que dura un día
-const CAMION_CADA=5;           // cada cuántos días pasa el camión
+const DIA=120;                 // segundos reales que dura un día (con atardecer y noche)
+const CAMION_CADA=2;           // cada cuántas noches pasa el camión
 const MES=30;                  // días de un mes de juego
-const GENERA={o:3,r:2,b:1};    // bolsas de 1 kg que produce tu casa al día: orgánicos, reciclables, basura
+// Tu casa produce una bolsa de 1 kg cada DIA/15 segundos, en este orden: o orgánico, r reciclable, b basura (8, 5 y 2 al día)
+const PATRON=['o','r','o','b','o','r','o','o','r','o','b','r','o','r','o'];
 const COBRO_CAMION=8;          // $ por kilo que el camión se lleva de tu casa
 const PAGO_RECICLAJE=15;       // $ por kilo de reciclaje
 const PAGO_VECINO=10;          // $ por kilo que recoges de un vecino
-const VECINO_DIA=2, VECINO_TOPE=10;
+const VECINO_DIA=5, VECINO_TOPE=12;
+const PAGO_CASERA=25;          // $ por bolsa de tierra que le llevas a una huerta casera
 const PACA_KG=12;              // orgánicos para llenar una paca
 const TIERRA_POR_FLOR=3;       // bolsas de tierra que da cada flor al recogerla
 const CAPACIDAD=[8,16,30];     // bolsas que carga cada carrito
 const VELOCIDAD=[14,22];       // metros por segundo: a pie y en bicicleta
-const RADIOS=[70,160,320,600,1300]; // el barrio se va abriendo por zonas alrededor de tu casa
+const RADIOS=[125,250,450,800,1300]; // el barrio se va abriendo por zonas alrededor de tu casa
 const NIVELES=[{vel:1,premio:1},{vel:1.4,premio:1.3},{vel:2,premio:1.7}];
 const FLORES=[ // nivel mínimo de la paca: 0, 1 o 2
   {n:'Margarita', spec:F('daisy','#ffffff','#d6dbe6','#f5c21b'),             nivel:0, seg:40,  premio:60},
@@ -40,9 +42,9 @@ const VECINOS=[['Doña Rosa','#7a4fa3'],['Don Luis','#3f6fb5'],['Familia Gómez'
 FLORES.forEach(f=>{ f.hi=genGrande(f.spec); });
 
 // ======================= ESTADO Y GUARDADO =======================
-const KEY='floresDelBarrio.v4';
-const nuevo=()=>({monedas:50,dia:1,t:0,casa:{o:3,r:2,b:1},carga:[],hechos:{},pagado:{},nivel:{},
-  pacas:{},huertas:{},vecinos:{},carrito:0,bici:0,sombreros:{},puesto:'',zona:0,mes:{gen:6,aprov:0,bot:0},found:{},movido:false});
+const KEY='floresDelBarrio.v5';
+const nuevo=()=>({monedas:50,dia:1,t:0,casa:{o:3,r:2,b:0},gen:0,genV:0,carga:[],hechos:{},pagado:{},nivel:{},
+  pacas:{},huertas:{},vecinos:{},caseras:{},carrito:0,bici:0,sombreros:{},puesto:'',zona:0,mes:{gen:6,aprov:0,bot:0},found:{},movido:false});
 let S=nuevo();
 try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.hechos) S=Object.assign(S,s); }catch(e){}
 function persist(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
@@ -123,13 +125,17 @@ const SITIOS={};
 const poner=(id,t,x,y,i)=>{ SITIOS[id]={id,t,x,y,i:i||0,d:dC(x,y)}; };
 const separado=(x,y,sep)=>Object.values(SITIOS).every(s=>Math.hypot(s.x-x,s.y-y)>=sep);
 poner('casa','casa',C[0],C[1]);
-{ const hs=[]; for(let i=0;i<MAPA.huertas.length;i+=2) hs.push([MAPA.huertas[i],MAPA.huertas[i+1]]);
-  hs.sort((a,b)=>dC(...a)-dC(...b)); let n=0;
-  for(const [x,y] of hs){ if(n>=8) break; if(dC(x,y)<18||!separado(x,y,14)) continue; poner('h'+n,'huerta',x,y,n); n++; } }
+// Huertas comunitarias (las marcaste a mano) y zonas de pacas: en una zona caben varias pacas, una al lado de otra
+const parPts=a=>{ const o=[]; for(let i=0;i<(a||[]).length;i+=2) o.push([a[i],a[i+1]]); return o; };
+const ZONAS=parPts(MAPA.zonasPaca), HCOM=parPts(MAPA.huertasCom);
+HCOM.forEach(([x,y],i)=>{ const z=ZONAS.some(([zx,zy])=>Math.hypot(zx-x,zy-y)<25); poner('h'+i,'huerta',x,y+(z?16:0),i); });
+const HUECOS=[[0,-4],[-15,-2],[15,-2],[-15,12],[15,12],[0,-19]];
+ZONAS.forEach(([zx,zy],z)=>{ let n=0; HUECOS.forEach(([dx,dy])=>{ const x=zx+dx, y=zy+dy; if(n<5&&enArea(x,y)&&!enEdificio(x,y)&&separado(x,y,11)){ poner('p'+z+'_'+n,'paca',x,y,z); n++; } }); });
 function cercaDeCasa(id,t,ang){ for(let r=22;r<90;r+=3) for(let k=0;k<32;k++){ const a=ang+(k%2?1:-1)*Math.ceil(k/2)*Math.PI/16, x=C[0]+Math.cos(a)*r, y=C[1]+Math.sin(a)*r;
     if(enArea(x,y)&&!enEdificio(x,y)&&separado(x,y,16)){ poner(id,t,x,y); return; } } poner(id,t,C[0]+25,C[1]+10); }
-cercaDeCasa('p0','paca',0); cercaDeCasa('r0','rec',Math.PI); cercaDeCasa('tienda','tienda',Math.PI/2);
-{ let n=1; for(let i=0;i<MAPA.pacas.length;i+=2){ const x=MAPA.pacas[i], y=MAPA.pacas[i+1]; if(separado(x,y,20)){ poner('p'+n,'paca',x,y); n++; } } }
+cercaDeCasa('r0','rec',Math.PI); cercaDeCasa('tienda','tienda',Math.PI/2);
+// Huertas caseras: las del censo del Jardín Botánico. Les llevas tierra y te pagan.
+const parH=parPts(MAPA.huertas); { let n=0; for(const [x,y] of parH) if(enArea(x,y)&&separado(x,y,14)){ poner('c'+n,'casera',x,y,n); n++; } }
 { let n=1; for(let i=0;i<MAPA.recicladores.length;i+=2){ const x=MAPA.recicladores[i], y=MAPA.recicladores[i+1]; if(separado(x,y,20)){ poner('r'+n,'rec',x,y); n++; } } }
 { const cand=[]; MAPA.edificios.forEach(p=>{ let x=0,y=0; for(let i=0;i<p.length;i+=2){ x+=p[i]; y+=p[i+1]; } x/=p.length/2; y/=p.length/2; if(enArea(x,y)) cand.push([x,y]); });
   cand.sort((a,b)=>dC(...a)-dC(...b)); let n=0;
@@ -155,15 +161,17 @@ function construir(id){ const s=SITIOS[id]; zonaPara(s); const j=cuenta[s.t]||0;
     programar({tipo:'nivel',s:id,n:1,costo:r10(300*(1+.3*j)),x:s.x+13,y:s.y+5,ico:'⬆️'},3);
     programar({tipo:'nivel',s:id,n:2,costo:r10(900*(1+.3*j)),x:s.x+13,y:s.y+5,ico:'⬆️'},9); } }
 const T_=SITIOS.tienda, enTienda=dx=>({x:T_.x+dx,y:T_.y+13});
-['p0','r0','h0','v0','tienda'].forEach(construir);
+const PRIMERA_PACA=LISTA.filter(s=>s.t==='paca').sort((a,b)=>a.d-b.d)[0].id, PRIMERA_HUERTA=LISTA.filter(s=>s.t==='huerta').sort((a,b)=>a.d-b.d)[0];
+const INICIO=[PRIMERA_PACA,'r0',...(PRIMERA_HUERTA?[PRIMERA_HUERTA.id]:[]),'v0','tienda'].filter(id=>SITIOS[id]);
+INICIO.forEach(construir);
 SEQ.push({tipo:'carrito',n:1,costo:150,...enTienda(-12),ico:'🛒'});
 const GLOBALES=[{tipo:'bici',costo:300,...enTienda(0),ico:'🚲'},{tipo:'sombrero',h:'gorra',costo:120,...enTienda(12),ico:'🧢'},
   {tipo:'carrito',n:2,costo:900,...enTienda(-12),ico:'🛒'},{tipo:'sombrero',h:'paja',costo:300,...enTienda(12),ico:'👒'},{tipo:'sombrero',h:'vueltiao',costo:700,...enTienda(12),ico:'🎩'}];
-LISTA.filter(s=>!['casa','p0','r0','h0','v0','tienda'].includes(s.id)).sort((a,b)=>a.d-b.d).forEach((s,k)=>{
+LISTA.filter(s=>s.t!=='casa'&&s.t!=='casera'&&!INICIO.includes(s.id)).sort((a,b)=>a.d-b.d).forEach((s,k)=>{
   construir(s.id); soltar(); if(k%3===1&&GLOBALES.length) SEQ.push(GLOBALES.shift()); });
 soltar(true); SEQ.push(...GLOBALES);
 const CONSTRUIDO_EN={}; SEQ.forEach((p,i)=>{ if(p.tipo==='construir') CONSTRUIDO_EN[p.s]=i; });
-const hecho=id=>id==='casa'||!!S.hechos[CONSTRUIDO_EN[id]];
+const hecho=id=>id==='casa'||SITIOS[id].t==='casera'||!!S.hechos[CONSTRUIDO_EN[id]];
 const nivelDe=id=>S.nivel[id]||0;
 const radio=()=>RADIOS[S.zona]||RADIOS[RADIOS.length-1];
 const proximos=()=>{ const r=[]; for(let i=0;i<SEQ.length&&r.length<2;i++) if(!S.hechos[i]){ const p=SEQ[i];
@@ -173,6 +181,7 @@ const proximos=()=>{ const r=[]; for(let i=0;i<SEQ.length&&r.length<2;i++) if(!S
 const paca=id=>S.pacas[id]||(S.pacas[id]={kg:0,s:[],tierra:0});
 const huerta=id=>S.huertas[id]||(S.huertas[id]={tierra:0,c:-1,t:0,prox:0});
 const vecino=id=>S.vecinos[id]||(S.vecinos[id]={n:4});
+const casera=id=>S.caseras[id]||(S.caseras[id]={pide:3});
 const cupos=id=>nivelDe(id)>=1?2:1;
 const pacaLista=p=>p.s.length&&p.s.every(s=>s.t>=FLORES[s.f].seg);
 const azar=lista=>lista[Math.floor(Math.random()*lista.length)];
@@ -193,8 +202,10 @@ const RUTAS=(()=>{ const L=[...nodos.values()]; if(!L.length) return null;
 function puntoEn(r,f){ const d=Math.max(0,Math.min(1,f))*r.largo; let i=1; while(i<r.acum.length-1&&r.acum[i]<d) i++;
   const a=r.pts[i-1], b=r.pts[i]||a, t=(d-r.acum[i-1])/((r.acum[i]-r.acum[i-1])||1); return {x:a[0]+(b[0]-a[0])*t, y:a[1]+(b[1]-a[1])*t, dx:b[0]-a[0]}; }
 let ladoCamion='right';
-function camion(){ if(!RUTAS) return null; const f=((S.dia%CAMION_CADA)*DIA+S.t)/(CAMION_CADA*DIA);
-  const c=f<.15?puntoEn(RUTAS.ida,f/.15):puntoEn(RUTAS.llegada,(f-.15)/.85); if(Math.abs(c.dx)>.5) ladoCamion=c.dx<0?'left':'right'; return c; }
+function camion(){ if(!RUTAS) return null; const h=hora(); let c=null;
+  if(nocheCamion()&&h>.62) c=puntoEn(RUTAS.llegada,(h-.62)/.38);            // llega durante la noche
+  else if(S.dia>1&&(S.dia-1)%CAMION_CADA===0&&h<.1) c=puntoEn(RUTAS.ida,h/.1);   // y se va al amanecer
+  if(c&&Math.abs(c.dx)>.5) ladoCamion=c.dx<0?'left':'right'; return c; }
 
 // ======================= ÁRBOLES =======================
 const AR=MAPA.arboles, CELDA=32, rejilla=new Map();
@@ -223,12 +234,12 @@ function ganar(v,x,y){ S.monedas+=v; flotar(x,y,'+$'+v,'#ffe27a'); bump('pMon');
 function bump(id){ const e=$(id); e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); }
 
 function pasarDia(){
-  S.dia++; S.casa.o+=GENERA.o; S.casa.r+=GENERA.r; S.casa.b+=GENERA.b; S.mes.gen+=GENERA.o+GENERA.r+GENERA.b;
-  LISTA.forEach(s=>{ if(s.t==='vecino'&&hecho(s.id)){ const v=vecino(s.id); v.n=Math.min(VECINO_TOPE,v.n+VECINO_DIA); } });
-  if(S.dia%CAMION_CADA===0){ const k=S.casa.o+S.casa.r+S.casa.b, cobro=k*COBRO_CAMION;
+  const termina=S.dia; S.dia++; avisoCamion=false;
+  LISTA.forEach(s=>{ if(s.t==='casera') casera(s.id).pide=Math.min(5,casera(s.id).pide+2); });
+  if(termina%CAMION_CADA===0){ const k=S.casa.o+S.casa.r+S.casa.b, cobro=k*COBRO_CAMION;
     S.monedas=Math.max(0,S.monedas-cobro); S.mes.bot+=k; S.casa={o:0,r:0,b:0};
     LISTA.forEach(s=>{ if(s.t==='vecino'&&hecho(s.id)) vecino(s.id).n=0; });
-    if(k){ flotar(C[0],C[1]-12,'−$'+cobro,'#ff8a80'); toast('🚛 El camión se llevó '+k+' kg de tu casa: −$'+cobro); } else toast('🚛 Pasó el camión y tu casa estaba limpia'); }
+    if(k){ flotar(C[0],C[1]-12,'−$'+cobro,'#ff8a80'); toast('🚛 Anoche el camión se llevó '+k+' kg de tu casa: −$'+cobro); } else toast('🚛 Anoche pasó el camión y tu casa estaba limpia'); }
   if(S.dia%MES===0){ const m=S.mes, pct=m.gen?Math.round(m.aprov/m.gen*100):0;
     toast('📅 Fin de mes: aprovechaste '+pct+'% y mandaste '+m.bot+' kg al botadero'); S.mes={gen:0,aprov:0,bot:0}; }
   persist();
@@ -241,6 +252,7 @@ function actuar(s){
     S.casa[t]--; S.carga.push(t); volar(s.x,s.y-6,pl.x,pl.y-10,t); return; }
   if(s.t==='vecino'){ const v=vecino(id); if(lleno||!v.n) return; const t=v.n%2?'r':'o'; v.n--; S.carga.push(t); S.mes.gen++;
     volar(s.x,s.y-6,pl.x,pl.y-10,t); ganar(PAGO_VECINO,s.x,s.y-14); return; }
+  if(s.t==='casera'){ const c=casera(id); if(!c.pide||!lleva('t')) return; quitar('t'); c.pide--; volar(pl.x,pl.y-10,s.x,s.y-4,'t'); ganar(PAGO_CASERA,s.x,s.y-14); return; }
   if(s.t==='rec'){ if(!lleva('r')) return; quitar('r'); S.mes.aprov++; volar(pl.x,pl.y-10,s.x,s.y-4,'r'); ganar(PAGO_RECICLAJE,s.x,s.y-14); return; }
   if(s.t==='paca'){ const p=paca(id);
     if(pacaLista(p)){ const pr=p.s.reduce((a,x)=>a+Math.round(FLORES[x.f].premio*NIVELES[nivelDe(id)].premio),0);
@@ -279,14 +291,21 @@ function objetivo(){
   if(listas.length) return cerca(listas);
   if(lleva('o')){ const o=cerca(activos('paca').filter(s=>{ const p=paca(s.id); return !p.s.length&&p.kg<PACA_KG; })); if(o) return o; }
   if(lleva('r')){ const o=cerca(activos('rec')); if(o) return o; }
-  if(lleva('t')){ const o=cerca(activos('huerta').filter(s=>huerta(s.id).c<0)); if(o) return o; }
+  if(lleva('t')){ const o=cerca(activos('huerta').filter(s=>huerta(s.id).c<0))||cerca(activos('casera').filter(s=>casera(s.id).pide>0)); if(o) return o; }
   if(S.carga.length<capacidad()){ if(S.casa.o+S.casa.r>0) return SITIOS.casa;
     const v=cerca(activos('vecino').filter(s=>vecino(s.id).n>=3)); if(v) return v; }
   return prox.length?SEQ[prox[0]]:null;
 }
 
+let avisoCamion=false;
+const hora=()=>S.t/DIA;                         // 0 amanece · 0,55 atardece · 0,7 noche · 0,93 amanece otra vez
+const nocheCamion=()=>S.dia%CAMION_CADA===0;     // el camión pasa en la noche de los días pares
 function update(dt){
   S.t+=dt; if(S.t>=DIA){ S.t-=DIA; pasarDia(); }
+  if(nocheCamion()&&!avisoCamion&&hora()>.5){ avisoCamion=true; toast('🚛 Esta noche pasa el camión: deja tu casa sin bolsas'); }
+  // la casa y los vecinos van sacando bolsas a lo largo del día
+  S.gen+=dt; while(S.gen>=DIA/PATRON.length){ S.gen-=DIA/PATRON.length; const t=PATRON[(S.genI=(S.genI||0)+1)%PATRON.length]; S.casa[t]++; S.mes.gen++; }
+  S.genV+=dt; while(S.genV>=DIA/VECINO_DIA){ S.genV-=DIA/VECINO_DIA; LISTA.forEach(s=>{ if(s.t==='vecino'&&hecho(s.id)){ const v=vecino(s.id); v.n=Math.min(VECINO_TOPE,v.n+1); } }); }
   for(const id in S.pacas){ const p=S.pacas[id]; p.s.forEach(x=>{ if(x.t<FLORES[x.f].seg) x.t+=dt*NIVELES[nivelDe(id)].vel; }); }
   for(const id in S.huertas){ const h=S.huertas[id]; if(h.c>=0&&h.t<CULTIVOS[h.c].seg) h.t+=dt*NIVELES[nivelDe(id)].vel; }
   // movimiento: joystick o teclas
@@ -339,6 +358,8 @@ function dibujarSitio(s){ const x=X(s.x), y=Y(s.y), id=s.id;
     for(let k=0;k<Math.min(6,v.n);k++) ctx.drawImage(k%2?ICON.o:ICON.r,x+36+(k%3)*12,y-10-Math.floor(k/3)*12,14,16);
     if(v.n) return ()=>globo(x,y-80,ICON.o,v.n); return; }
   if(s.t==='tienda'){ ctx.drawImage(TIENDA,x-45,y-66,90,78); return; }
+  if(s.t==='casera'){ const c=casera(id); ctx.drawImage(HUERTA,x-22,y-20,44,28); ctx.fillStyle='#e9d9b0'; for(let k=0;k<5;k++) ctx.fillRect(x-24+k*12,y+4,3,8); ctx.fillRect(x-24,y+6,51,2);
+    if(c.pide&&lleva('t')) return ()=>globo(x,y-38,ICON.t,c.pide); return; }
   if(s.t==='rec'){ ctx.drawImage(CARRETA,x+6,y-30,48,36); ctx.drawImage(persona(RECI,'down',0),x-22,y-48,36,51);
     return ()=>globo(x,y-62,ICON.r,undefined,lleva('r')?'#c8f7c5':'#fff'); }
   const n=nivelDe(id), e=[1,1.2,1.4][n];
@@ -376,6 +397,23 @@ function dibujarJugador(){ const x=X(pl.x), y=Y(pl.y), atras=(pl.dir==='right'||
       if(h.rayas){ ctx.fillStyle='#2b1d0e'; for(let i=0;i<6;i++) ctx.fillRect(px-2+i*8,py+4,4,3); }
       ctx.fillStyle=h.copa; ctx.fillRect(px+6,py-7,24,10); ctx.fillStyle=h.cinta; ctx.fillRect(px+6,py,24,3); } } }
 
+const nocheCv=document.createElement('canvas'), nctx=nocheCv.getContext('2d');
+function oscuridad(){ const h=hora(); return h<.55?0:h<.7?(h-.55)/.15*.6:h<.92?.6:h<1?(1-h)/.08*.6:0; }
+function dibujarNoche(){ const a=oscuridad(); if(a<=0) return;
+  if(nocheCv.width!==cv.width||nocheCv.height!==cv.height){ nocheCv.width=cv.width; nocheCv.height=cv.height; }
+  nctx.setTransform(1,0,0,1,0,0); nctx.globalCompositeOperation='source-over'; nctx.clearRect(0,0,nocheCv.width,nocheCv.height);
+  nctx.fillStyle='rgba(14,22,58,'+a+')'; nctx.fillRect(0,0,nocheCv.width,nocheCv.height);
+  nctx.setTransform(K,0,0,K,0,0); nctx.globalCompositeOperation='destination-out';
+  const luz=(x,y,r,f)=>{ const g=nctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,'rgba(0,0,0,'+f+')'); g.addColorStop(1,'rgba(0,0,0,0)'); nctx.fillStyle=g; nctx.beginPath(); nctx.arc(x,y,r,0,7); nctx.fill(); };
+  luz(X(pl.x),Y(pl.y)-20,110,.9);
+  LISTA.forEach(s=>{ if(!hecho(s.id)) return; const x=X(s.x), y=Y(s.y); if(x<-150||y<-150||x>VW+150||y>VH+150) return;
+    if(s.t==='casa'||s.t==='vecino'||s.t==='tienda') luz(x,y-24,70,.75); else if(s.t!=='casera') luz(x,y-10,45,.5); });
+  const cm=camion(); if(cm) luz(X(cm.x)+(ladoCamion==='right'?40:-40),Y(cm.y)-10,70,.8);
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(nocheCv,0,0); ctx.restore();
+  // ventanas encendidas
+  ctx.fillStyle='rgba(255,226,122,'+Math.min(1,a*1.6)+')';
+  LISTA.forEach(s=>{ if(!(s.t==='casa'||s.t==='vecino')||!hecho(s.id)) return; const x=X(s.x), y=Y(s.y); ctx.fillRect(x-24,y-15,9,9); ctx.fillRect(x+15,y-15,9,9); });
+}
 function flecha(o){ if(!o) return; const x=X(o.x), y=Y(o.y), m=30;
   if(x>m&&x<VW-m&&y>90&&y<VH-m){ const b=Math.abs(Math.sin(time*5))*10, ay=y-(o.tipo?52:110)-b;
     ctx.fillStyle='#2b1d0e'; ctx.beginPath(); ctx.moveTo(x-16,ay-3); ctx.lineTo(x+16,ay-3); ctx.lineTo(x+16,ay+10); ctx.lineTo(x+24,ay+10); ctx.lineTo(x,ay+34); ctx.lineTo(x-24,ay+10); ctx.lineTo(x-16,ay+10); ctx.closePath(); ctx.fill();
@@ -416,6 +454,7 @@ function draw(dt){
     else if(e.s){ const f=dibujarSitio(e.s); if(f) post.push(f); }
     else ctx.drawImage(ESPECIES[AR[e.k+2]].mini,X(AR[e.k])-16,Y(AR[e.k+1])-44,32,48);
   }
+  dibujarNoche();
   prox.forEach(dibujarPad);   // los cuadros para construir van encima de los árboles para que siempre se vean
   post.forEach(f=>f());
   vuelos.forEach(v=>{ const t=v.t, x=X(v.ax+(v.bx-v.ax)*t), y=Y(v.ay+(v.by-v.ay)*t)-Math.sin(t*Math.PI)*24;
@@ -435,7 +474,7 @@ function loop(ts){ const dt=Math.min(.05,(ts-last)/1000||0); last=ts; time+=dt; 
 
 // ======================= INTERFAZ =======================
 function hud(){ $('pMon').textContent='$'+S.monedas; $('pCarga').textContent=S.carga.length+'/'+capacidad();
-  $('pCam').textContent=(CAMION_CADA-S.dia%CAMION_CADA)+'d'; }
+  $('pCam').textContent=nocheCamion()?'hoy':'mañana'; const n=oscuridad()>.3; $('pDia').textContent=(n?'🌙 ':'☀️ ')+'Día '+S.dia; }
 let toastT=0; function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>e.style.display='none',3500); }
 
 // Joystick: arrastra el dedo en cualquier parte. Un toque corto sobre un árbol abre su ficha.

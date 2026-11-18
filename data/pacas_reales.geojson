@@ -1,0 +1,5 @@
+{"type":"FeatureCollection","features":[
+{"type":"Feature","properties":{"nombre":"Zona de pacas 1"},"geometry":{"type":"Point","coordinates":[-74.0439866,4.732375]}},
+{"type":"Feature","properties":{"nombre":"Zona de pacas 2"},"geometry":{"type":"Point","coordinates":[-74.0405475,4.7313509]}},
+{"type":"Feature","properties":{"nombre":"Zona de pacas 3"},"geometry":{"type":"Point","coordinates":[-74.043783,4.7307347]}}
+]}

@@ -10,3 +10,5 @@ data/preview.html
 
 # Copia original del polígono (el juego usa data/area_juego.geojson)
 /area_juego.geojson
+!data/pacas_reales.geojson
+!data/huertas_reales.geojson

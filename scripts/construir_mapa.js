@@ -89,11 +89,18 @@ for (const f of leer('huertas')) { if (!f.geometry) continue; const p = P(f.geom
 // ---------- Sitios del juego ----------
 const cArea = centroide(area.slice(0, -1));
 const masCercano = (lista, obj, ok = () => true) => lista.filter(ok).reduce((m, p) => !m || Math.hypot(p[0] - obj[0], p[1] - obj[1]) < Math.hypot(m[0] - obj[0], m[1] - obj[1]) ? p : m, null);
-// Casa: el edificio más cercano al centro del área (o el centro, si no hay edificios)
-const casa = masCercano(edificios.map(centroide).filter(enArea), cArea) || cArea;
-// Pacas: en los parques
-const pacas = [];
-for (const q of parques) { const c = centroide(q.pts); if (enArea(c) && !pacas.some(p => Math.hypot(p[0] - c[0], p[1] - c[1]) < 60) && pacas.length < 6) pacas.push(c); }
+// Zonas de pacas y huertas comunitarias reales: puntos marcados a mano (data/pacas_reales.geojson y data/huertas_reales.geojson)
+const puntos = n => leer(n).filter(f => f.geometry && f.geometry.type === 'Point').map(f => P(f.geometry.coordinates)).filter(enArea);
+const zonasPaca = puntos('pacas_reales'), huertasCom = puntos('huertas_reales');
+// Casa: el edificio más cercano al punto medio de las dos zonas de pacas más cercanas entre sí
+// (sin zonas, el más cercano al centro del área)
+let foco = cArea;
+if (zonasPaca.length >= 2) { let md = Infinity;
+  for (let i = 0; i < zonasPaca.length; i++) for (let j = i + 1; j < zonasPaca.length; j++) {
+    const a = zonasPaca[i], b = zonasPaca[j], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (d < md) { md = d; foco = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; } } }
+else if (zonasPaca.length === 1) foco = zonasPaca[0];
+const lejosDeZonas = c => zonasPaca.concat(huertasCom).every(z => Math.hypot(z[0] - c[0], z[1] - c[1]) > 35);
+const casa = masCercano(edificios.map(centroide).filter(c => enArea(c) && lejosDeZonas(c)), foco) || foco;
 // Recicladores: en esquinas, repartidos a lo largo del área
 const xs = area.map(p => p[0]), xmin = Math.min(...xs), xmax = Math.max(...xs);
 const recicladores = [0.2, 0.5, 0.8].map(f => masCercano(vertices, [xmin + f * (xmax - xmin), cArea[1]])).filter(Boolean).map(p => [p[0] + 6, p[1] + 6]);
@@ -103,12 +110,12 @@ const mapa = {
   w: Math.ceil(W), h: Math.ceil(H), giro: r1(ANG * 180 / Math.PI),
   area: plana(area), calles, rotulos,
   edificios: edificios.map(plana), agua, parques: parques.map(q => ({ n: q.n, p: plana(q.pts) })),
-  especies, arboles, huertas: plana(huertas), casa: plana([casa]), pacas: plana(pacas), recicladores: plana(recicladores),
+  especies, arboles, huertas: plana(huertas), casa: plana([casa]), zonasPaca: plana(zonasPaca), huertasCom: plana(huertasCom), recicladores: plana(recicladores),
 };
 fs.writeFileSync(path.join(DATA, 'mapa.js'), '// Generado por scripts/construir_mapa.js: no editar a mano\nwindow.MAPA=' + JSON.stringify(mapa) + ';\n');
 
 console.log(`Mapa: ${mapa.w} x ${mapa.h} m, girado ${mapa.giro}° para enderezar las calles`);
 console.log(`Calles: ${calles.length} · Rótulos: ${rotulos.length} · Edificios: ${edificios.length} · Parques: ${parques.length} · Agua: ${agua.length}`);
 console.log(`Árboles: ${arboles.length / 4} (${especies.length} especies) · Huertas: ${huertas.length}`);
-console.log(`Sitios del juego: casa en ${plana([casa])} · ${pacas.length} pacas · ${recicladores.length} recicladores`);
+console.log(`Sitios del juego: casa en ${plana([casa])} · ${zonasPaca.length} zonas de pacas · ${huertasCom.length} huertas comunitarias · ${recicladores.length} recicladores`);
 console.log(`Archivo: data/mapa.js (${Math.round(fs.statSync(path.join(DATA, 'mapa.js')).size / 1024)} KB)`);

@@ -1,0 +1,4 @@
+{"type":"FeatureCollection","features":[
+{"type":"Feature","properties":{"nombre":"Huerta comunitaria Las Margaritas 2"},"geometry":{"type":"Point","coordinates":[-74.043783,4.7307347]}},
+{"type":"Feature","properties":{"nombre":"Huerta comunitaria Las Margaritas 1"},"geometry":{"type":"Point","coordinates":[-74.0439866,4.732375]}}
+]}

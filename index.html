@@ -13,14 +13,14 @@
   html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--cream);
     font-family:'Press Start 2P',ui-monospace,Menlo,monospace;-webkit-user-select:none;user-select:none;overscroll-behavior:none;-webkit-touch-callout:none}
   #game{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none;background:#dfeecb}
-  #hud{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:flex-end;
+  #hud{position:fixed;left:0;right:0;top:0;display:flex;gap:4px;align-items:center;justify-content:flex-end;
     padding:calc(env(safe-area-inset-top) + 8px) 8px 8px;pointer-events:none;z-index:2}
   #hud .sp{flex:1}
-  .pill{background:rgba(24,38,28,.82);border:2px solid #0d150f;border-radius:20px;padding:7px 10px;font-size:11px;line-height:1;white-space:nowrap;color:#fff}
+  .pill{background:rgba(24,38,28,.82);border:2px solid #0d150f;border-radius:20px;padding:6px 7px;font-size:clamp(8px,2.4vw,11px);line-height:1;white-space:nowrap;color:#fff}
   .pill.mon{color:#ffe27a}
   .bump{animation:bump .25s}
   @keyframes bump{50%{transform:scale(1.18)}}
-  #btnAlbum{pointer-events:auto;font-size:20px;line-height:1;background:rgba(24,38,28,.82);border:2px solid #0d150f;border-radius:20px;padding:5px 9px;cursor:pointer}
+  #btnAlbum{pointer-events:auto;font-size:18px;line-height:1;background:rgba(24,38,28,.82);border:2px solid #0d150f;border-radius:20px;padding:4px 7px;cursor:pointer;flex:none}
   #swipe{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 70px);text-align:center;font-size:14px;color:#fff;
     text-shadow:0 2px 0 #2b1d0e,2px 0 0 #2b1d0e,-2px 0 0 #2b1d0e,0 -2px 0 #2b1d0e;pointer-events:none;z-index:2;animation:latido 1.4s infinite}
   @keyframes latido{50%{transform:scale(1.08)}}
@@ -57,7 +57,7 @@
 <canvas id="game"></canvas>
 <div id="hud">
   <button id="btnAlbum" title="Árboles del barrio">🌳</button><span class="sp"></span>
-  <span class="pill mon" id="pMon">$0</span><span class="pill">🛒 <span id="pCarga">0/8</span></span><span class="pill">🚛 <span id="pCam">5d</span></span>
+  <span class="pill" id="pDia">☀️ Día 1</span><span class="pill mon" id="pMon">$0</span><span class="pill">🛒 <span id="pCarga">0/8</span></span><span class="pill">🚛 <span id="pCam">5d</span></span>
 </div>
 <div id="swipe">Arrastra para moverte</div>
 <div id="toast"></div>
