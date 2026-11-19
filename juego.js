@@ -314,11 +314,15 @@ function actuar(s){
       if(h.tierra>=CULTIVOS[h.prox].tierra){ h.tierra=0; h.c=h.prox; h.t=0; } } }
 }
 // Pagar una construcción: te paras encima y la plata se va gastando
+// Después de comprar algo, el cuadro queda en pausa hasta que te alejes; así no se compra lo siguiente sin querer
+let espera=null;
+const enPausa=p=>espera&&Math.hypot(p.x-espera.x,p.y-espera.y)<1;
 function pagar(p,dt){ const i=p.k, ya=S.pagado[i]||0;
   if(p.costo>0){ const falta=p.costo-ya; if(S.monedas<=0) return; const v=Math.min(falta,S.monedas,Math.max(1,Math.ceil(Math.max(40,p.costo/1.2)*dt)));
     S.monedas-=v; S.pagado[i]=ya+v; if(Math.random()<.5) volar(pl.x,pl.y-12,p.x,p.y,'$'); if(S.pagado[i]<p.costo) return; }
   else { S.pagado[i]=ya-dt; if(S.pagado[i]>-.35) return; }   // lo gratis se construye con solo pararse un momento
   if(typeof i==='number') S.hechos[i]=1; delete S.pagado[i];
+  espera={x:p.x,y:p.y};   // no sigue comprando lo siguiente hasta que te salgas del cuadro
   if(p.tipo==='construir'){ const s=SITIOS[p.s]; if(s.t==='huerta') huerta(s.id).prox=elegirCultivo(s.id); flotar(s.x,s.y-20,'¡Listo!','#9cff9c'); }
   else if(p.tipo==='nivel'){ S.nivel[p.s]=p.n; flotar(p.x,p.y-20,'¡Nivel '+(p.n+1)+'!','#9cff9c'); }
   else if(p.tipo==='carrito'){ S.carrito=p.n; flotar(p.x,p.y-20,'+'+CAPACIDAD[p.n]+' bolsas','#9cff9c'); }
@@ -368,7 +372,8 @@ function update(dt){
   } else { pl.step=0; quieto+=dt; }
   // acciones automáticas cada 0,12 s con los sitios cercanos
   tic+=dt; if(tic>=.12){ tic=0; LISTA.forEach(s=>{ if(hecho(s.id)&&Math.hypot(s.x-pl.x,s.y+3-pl.y)<9) actuar(s); }); }
-  pads().forEach(p=>{ if(Math.hypot(p.x-pl.x,p.y-pl.y)<4.5) pagar(p,dt); });
+  if(espera&&Math.hypot(espera.x-pl.x,espera.y-pl.y)>6) espera=null;
+  pads().forEach(p=>{ if(!enPausa(p)&&Math.hypot(p.x-pl.x,p.y-pl.y)<4.5) pagar(p,dt); });
   vuelos.forEach(v=>v.t+=dt/.3); for(let i=vuelos.length-1;i>=0;i--) if(vuelos[i].t>=1) vuelos.splice(i,1);
   textos.forEach(v=>v.t+=dt); for(let i=textos.length-1;i>=0;i--) if(textos[i].t>=1.2) textos.splice(i,1);
 }
@@ -537,7 +542,7 @@ function tarjeta(){ let m=null, md=14; pads().forEach(p=>{ const d=Math.hypot(p.
   const [t,d]=infoPad(m), falta=Math.max(0,m.costo-Math.max(0,S.pagado[m.k]||0));
   $('infoIco').textContent=m.ico; $('infoT').textContent=t; $('infoD').textContent=d;
   $('infoC').textContent=m.costo?'$'+falta:'GRATIS'; $('infoC').className=S.monedas>=falta?'ok':'';
-  $('infoP').textContent=md<4.5?'':(S.monedas>=falta?'Párate en el cuadro':'Te faltan $'+(falta-S.monedas));
+  $('infoP').textContent=enPausa(m)?'Sal del cuadro y vuelve a entrar para comprarlo':md<4.5?'':(S.monedas>=falta?'Párate en el cuadro':'Te faltan $'+(falta-S.monedas));
   e.style.display='flex'; infoK=m.k; }
 let toastT=0; function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>e.style.display='none',3500); }
 
