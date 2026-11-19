@@ -49,7 +49,6 @@
   .pics{display:flex;gap:12px;justify-content:center;align-items:center}
   .pic{width:112px;height:112px;border:4px solid var(--ink)}
   #cardSprite{width:168px;height:168px;background:#f3ead2;padding:4px}
-  #cardPhoto{display:none;object-fit:cover;image-rendering:pixelated}
   #cardStatus{color:var(--green)}
   #albumBox{width:min(560px,100%);max-height:92vh;display:flex;flex-direction:column;padding:14px;font-size:9px}
   #albumBox h2{font-size:12px;margin:2px 0 4px;text-align:center}
@@ -77,16 +76,12 @@
   <div class="box" id="card">
     <div class="pics">
       <canvas class="pic" id="cardSprite" width="16" height="16"></canvas>
-      <img class="pic" id="cardPhoto" alt="Tu foto">
     </div>
     <h2 id="cardName"></h2>
     <em id="cardSci"></em>
     <p id="cardFact"></p>
     <div id="cardStatus"></div>
-    <button class="btn" id="btnFoto">REGISTRAR CON FOTO</button>
-    <button class="btn alt" id="btnReg">REGISTRAR SIN FOTO</button>
-    <button class="btn alt" id="btnClose">CERRAR</button>
-    <input type="file" id="file" accept="image/*" capture="environment" hidden>
+    <button class="btn" id="btnClose">CERRAR</button>
   </div>
 </div>
 

@@ -21,6 +21,17 @@ const CAPAS = [
     url: 'https://visorsrv.idrd.gov.co/srv/rest/services/ParquesIDRD/Parques/MapServer/0' },
   { nombre: 'techos_verdes', titulo: 'Techos verdes y jardines verticales', color: '#5e35b1',
     url: 'https://mapas.ambientebogota.gov.co/server/rest/services/Ecourbanismo/Techos_verdes_Jardines_Verticales/MapServer/1' },
+  // Catastro Bogotá: construcciones, uso de cada manzana, espacio público y vías reales
+  { nombre: 'construcciones', titulo: 'Construcciones (Catastro)', color: '#8d6e63', paginar: true, mapa: false,
+    url: 'https://serviciosgis.catastrobogota.gov.co/arcgis/rest/services/Mapa_Referencia/Mapa_Referencia/MapServer/39' },
+  { nombre: 'usos', titulo: 'Uso predominante por manzana', color: '#ff7043', paginar: true, mapa: false,
+    url: 'https://serviciosgis.catastrobogota.gov.co/arcgis/rest/services/catastro/usopredominante/MapServer/0' },
+  { nombre: 'espacio_publico', titulo: 'Predios de uso público', color: '#43a047', paginar: true,
+    url: 'https://serviciosgis.catastrobogota.gov.co/arcgis/rest/services/espaciopublico/inventarios/MapServer/3' },
+  { nombre: 'calzadas', titulo: 'Calzadas', color: '#757575', paginar: true, mapa: false,
+    url: 'https://serviciosgis.catastrobogota.gov.co/arcgis/rest/services/Mapa_Referencia/Mapa_Referencia/MapServer/15' },
+  { nombre: 'andenes', titulo: 'Andenes', color: '#bdbdbd', paginar: true, mapa: false,
+    url: 'https://serviciosgis.catastrobogota.gov.co/arcgis/rest/services/Mapa_Referencia/Mapa_Referencia/MapServer/16' },
 ];
 
 // ---------- Área del juego ----------
@@ -151,7 +162,7 @@ async function descargarOSM(poligono) {
 function escribirPreview(poligono, resultados) {
   const incrustar = o => JSON.stringify(o).replace(/</g, '\\u003c');
   const area = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: poligono } };
-  const capas = resultados.filter(r => r.datos).map(r => ({ titulo: r.titulo, color: r.color, datos: r.datos }));
+  const capas = resultados.filter(r => r.datos && r.mapa !== false).map(r => ({ titulo: r.titulo, color: r.color, datos: r.datos }));
   const html = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Verificación del área del juego</title>

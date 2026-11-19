@@ -38,11 +38,12 @@ const SOMBREROS=[
   {id:'paja',     n:'Sombrero de paja',  copa:'#f0d98a', ala:'#e6c66a', cinta:'#7a4a21'},
   {id:'vueltiao', n:'Sombrero vueltiao', copa:'#f3ead2', ala:'#f3ead2', cinta:'#2b1d0e', rayas:true},
 ];
+const EDIFICIOS_NOM=['Edificio Los Cedros','Edificio El Nogal'];
 const VECINOS=[['Doña Rosa','#7a4fa3'],['Don Luis','#3f6fb5'],['Familia Gómez','#d98a2b'],['Sofi y Mateo','#2f8f7a'],['Doña Carmen','#b5506e'],['Juancho','#607d8b']];
 FLORES.forEach(f=>{ f.hi=genGrande(f.spec); });
 
 // ======================= ESTADO Y GUARDADO =======================
-const KEY='floresDelBarrio.v5';
+const KEY='floresDelBarrio.v6';
 const nuevo=()=>({monedas:50,dia:1,t:0,casa:{o:3,r:2,b:0},gen:0,genV:0,carga:[],hechos:{},pagado:{},nivel:{},
   pacas:{},huertas:{},vecinos:{},caseras:{},carrito:0,bici:0,sombreros:{},puesto:'',zona:0,mes:{gen:6,aprov:0,bot:0},found:{},movido:false});
 let S=nuevo();
@@ -60,21 +61,28 @@ const FUERA=new Path2D(); FUERA.rect(-500,-500,MAPA.w+1000,MAPA.h+1000); FUERA.a
 const anchos=[...new Set(MAPA.calles.filter(c=>!c.s).map(c=>c.a))].sort((a,b)=>a-b);
 const CALLES=anchos.map(a=>({a,q:junta(MAPA.calles.filter(c=>!c.s&&c.a===a).map(c=>c.p))}));
 const SENDEROS=junta(MAPA.calles.filter(c=>c.s).map(c=>c.p));
-const EDIFICIOS=junta(MAPA.edificios,true), PARQUES=junta(MAPA.parques.map(p=>p.p),true);
+const USO_COLOR={R:'#eadcc0',C:'#f1c7a3',D:'#cfd9ea',B:'#d9d2c4',O:'#e2dacb'};
+const EDIFICIOS=Object.keys(USO_COLOR).map(u=>({u,q:junta(MAPA.edificios.filter(e=>e.u===u).map(e=>e.p),true)}));
+const PARQUES=junta(MAPA.parques.map(p=>p.p).concat((MAPA.verdes||[]).map(v=>v.p)),true);
+const CALZADAS=junta(MAPA.calzadas||[],true), ANDENES=junta(MAPA.andenes||[],true);
 const AGUA_POL=junta(MAPA.agua.filter(a=>a.pol).map(a=>a.p),true), AGUA_LIN=MAPA.agua.filter(a=>!a.pol).map(a=>({a:a.a,q:trazo(a.p)}));
 function enPoligono(p,x,y){ let d=false; for(let i=0,j=p.length-2;i<p.length;j=i,i+=2){ if((p[i+1]>y)!==(p[j+1]>y)&&x<(p[j]-p[i])*(y-p[i+1])/(p[j+1]-p[i+1])+p[i]) d=!d; } return d; }
 const enArea=(x,y)=>enPoligono(MAPA.area,x,y);
-const enEdificio=(x,y)=>MAPA.edificios.some(p=>enPoligono(p,x,y));
+const caja=p=>{ let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity; for(let i=0;i<p.length;i+=2){ a=Math.min(a,p[i]); c=Math.max(c,p[i]); b=Math.min(b,p[i+1]); d=Math.max(d,p[i+1]); } return [a,b,c,d]; };
+MAPA.edificios.forEach(e=>{ e.b=caja(e.p); });
+const enEdificio=(x,y)=>MAPA.edificios.some(e=>x>=e.b[0]&&x<=e.b[2]&&y>=e.b[1]&&y<=e.b[3]&&enPoligono(e.p,x,y));
+const ZONAS_VERDES=MAPA.parques.map(p=>p.p).concat((MAPA.verdes||[]).map(v=>v.p)).map(p=>({p,b:caja(p)}));
+const enVerde=(x,y)=>ZONAS_VERDES.some(v=>x>=v.b[0]&&x<=v.b[2]&&y>=v.b[1]&&y<=v.b[3]&&enPoligono(v.p,x,y));
 
 function dibujarMapa(g,escala,ox,oy){
   g.save(); g.setTransform(escala,0,0,escala,-ox,-oy);
-  g.fillStyle='#bfe3a0'; g.fill(PARQUES);
+  g.fillStyle='#bfe3a0'; g.fill(PARQUES); g.fillStyle='#e7e0cf'; g.fill(ANDENES);
   g.fillStyle='#9fd3f0'; g.fill(AGUA_POL); g.strokeStyle='#9fd3f0'; g.lineCap=g.lineJoin='round';
   AGUA_LIN.forEach(a=>{ g.lineWidth=a.a; g.stroke(a.q); });
   g.strokeStyle='#cfc3a4'; CALLES.forEach(c=>{ g.lineWidth=c.a+3.2; g.stroke(c.q); });
-  g.strokeStyle='#fffdf6'; CALLES.forEach(c=>{ g.lineWidth=c.a; g.stroke(c.q); });
+  g.strokeStyle='#fffdf6'; CALLES.forEach(c=>{ g.lineWidth=c.a; g.stroke(c.q); }); g.fillStyle='#fffdf6'; g.fill(CALZADAS);
   g.strokeStyle='#e3cf9c'; g.lineWidth=1.6; g.setLineDash([2.5,2]); g.stroke(SENDEROS); g.setLineDash([]);
-  g.fillStyle='#eadcc0'; g.fill(EDIFICIOS); g.strokeStyle='#c9b48c'; g.lineWidth=.5; g.stroke(EDIFICIOS);
+  g.strokeStyle='#c9b48c'; g.lineWidth=.5; EDIFICIOS.forEach(e=>{ g.fillStyle=USO_COLOR[e.u]; g.fill(e.q); g.stroke(e.q); });
   g.fillStyle='rgba(40,60,48,.55)'; g.fill(FUERA,'evenodd');
   g.restore();
 }
@@ -86,6 +94,10 @@ const casaSpr=col=>spr(26,26,r=>{ r(2,24,24,2,'rgba(0,0,0,.2)'); r(18,0,3,5,'#8d
   r(0,12,26,2,shade(col,.62)); r(2,14,22,10,'#f3e6c6'); r(2,22,22,2,'#d9c79b'); r(11,17,5,7,'#7a4a21'); r(14,20,1,1,'#ffd23f');
   r(4,16,5,5,'#fff'); r(5,17,3,3,'#8fd0f0'); r(17,16,5,5,'#fff'); r(18,17,3,3,'#8fd0f0'); });
 const CASA=casaSpr('#c0483c'), CASAS_VEC=VECINOS.map(v=>casaSpr(v[1]));
+const TORRE=spr(26,40,r=>{ r(2,38,24,2,'rgba(0,0,0,.2)'); r(2,2,22,36,'#c98b6b'); r(2,2,22,2,'#a8694c'); r(1,0,24,3,'#8d5a42');
+  for(let y=6;y<32;y+=6) for(let x=5;x<22;x+=6){ r(x,y,4,4,'#fff'); r(x+1,y+1,2,2,'#8fd0f0'); } r(10,32,6,6,'#7a4a21'); r(15,35,1,1,'#ffd23f'); });
+const nombreVecino=s=>s.grande?EDIFICIOS_NOM[s.i%EDIFICIOS_NOM.length]:VECINOS[s.i%VECINOS.length][0];
+const dibujoVecino=s=>s.grande?[TORRE,78,120]:[CASAS_VEC[s.i%CASAS_VEC.length],78,78];
 const bolsa=(c,o)=>spr(7,8,r=>{ r(1,3,5,5,c); r(0,4,7,3,c); r(2,1,3,2,o); r(3,0,1,1,o); r(2,4,1,1,'rgba(255,255,255,.35)'); });
 const ICON={o:bolsa('#8a5a2b','#5c3a1a'), r:bolsa('#3f8fe0','#2560a8'), b:bolsa('#2b2b2b','#555'),
   t:spr(9,6,r=>{ r(1,2,7,4,'#5c3a1a'); r(0,4,9,2,'#4a2f17'); r(3,1,3,1,'#6b4320'); r(2,2,1,1,'#7ed957'); r(6,3,1,1,'#7ed957'); })};
@@ -128,20 +140,29 @@ poner('casa','casa',C[0],C[1]);
 // Huertas comunitarias (las marcaste a mano) y zonas de pacas: en una zona caben varias pacas, una al lado de otra
 const parPts=a=>{ const o=[]; for(let i=0;i<(a||[]).length;i+=2) o.push([a[i],a[i+1]]); return o; };
 const ZONAS=parPts(MAPA.zonasPaca), HCOM=parPts(MAPA.huertasCom);
-HCOM.forEach(([x,y],i)=>{ const z=ZONAS.some(([zx,zy])=>Math.hypot(zx-x,zy-y)<25); poner('h'+i,'huerta',x,y+(z?16:0),i); });
+HCOM.forEach(([x,y],i)=>{ const z=ZONAS.some(([zx,zy])=>Math.hypot(zx-x,zy-y)<25); if(!z){ poner('h'+i,'huerta',x,y,i); return; }
+  // si comparte el punto con una zona de pacas, se pone al lado, dentro de la zona verde
+  const op=[[0,16],[0,-16],[16,8],[-16,8],[0,24],[24,0],[-24,0]].find(([dx,dy])=>enVerde(x+dx,y+dy)&&!enEdificio(x+dx,y+dy))||[0,16];
+  poner('h'+i,'huerta',x+op[0],y+op[1],i); });
 const HUECOS=[[0,-4],[-15,-2],[15,-2],[-15,12],[15,12],[0,-19]];
-ZONAS.forEach(([zx,zy],z)=>{ let n=0; HUECOS.forEach(([dx,dy])=>{ const x=zx+dx, y=zy+dy; if(n<5&&enArea(x,y)&&!enEdificio(x,y)&&separado(x,y,11)){ poner('p'+z+'_'+n,'paca',x,y,z); n++; } }); });
+ZONAS.forEach(([zx,zy],z)=>{ let n=0; const prueba=(x,y)=>{ if(n<5&&enArea(x,y)&&enVerde(x,y)&&!enEdificio(x,y)&&separado(x,y,11)){ poner('p'+z+'_'+n,'paca',x,y,z); n++; } };
+  HUECOS.forEach(([dx,dy])=>prueba(zx+dx,zy+dy));
+  for(let r=8;r<=40&&n<3;r+=4) for(let k=0;k<16&&n<3;k++) prueba(zx+Math.cos(k*Math.PI/8)*r,zy+Math.sin(k*Math.PI/8)*r); });   // si la zona es pequeña, busca más espacio verde cerca
 function cercaDeCasa(id,t,ang){ for(let r=22;r<90;r+=3) for(let k=0;k<32;k++){ const a=ang+(k%2?1:-1)*Math.ceil(k/2)*Math.PI/16, x=C[0]+Math.cos(a)*r, y=C[1]+Math.sin(a)*r;
-    if(enArea(x,y)&&!enEdificio(x,y)&&separado(x,y,16)){ poner(id,t,x,y); return; } } poner(id,t,C[0]+25,C[1]+10); }
+    if(enArea(x,y)&&!enEdificio(x,y)&&!enVerde(x,y)&&separado(x,y,16)){ poner(id,t,x,y); return; } } poner(id,t,C[0]+25,C[1]+10); }
 cercaDeCasa('r0','rec',Math.PI); cercaDeCasa('tienda','tienda',Math.PI/2);
 // Huertas caseras: las del censo del Jardín Botánico. Les llevas tierra y te pagan.
 const parH=parPts(MAPA.huertas); { let n=0; for(const [x,y] of parH) if(enArea(x,y)&&separado(x,y,14)){ poner('c'+n,'casera',x,y,n); n++; } }
 { let n=1; for(let i=0;i<MAPA.recicladores.length;i+=2){ const x=MAPA.recicladores[i], y=MAPA.recicladores[i+1]; if(separado(x,y,20)){ poner('r'+n,'rec',x,y); n++; } } }
-{ const cand=[]; MAPA.edificios.forEach(p=>{ let x=0,y=0; for(let i=0;i<p.length;i+=2){ x+=p[i]; y+=p[i+1]; } x/=p.length/2; y/=p.length/2; if(enArea(x,y)) cand.push([x,y]); });
-  cand.sort((a,b)=>dC(...a)-dC(...b)); let n=0;
+// Vecinos: construcciones residenciales reales (Catastro). Hasta 3 pisos es una casa; de 5 pisos en adelante, un edificio con mucha más basura.
+{ const cand=[]; MAPA.edificios.forEach(e=>{ if(e.u!=='R') return; let x=0,y=0; for(let i=0;i<e.p.length;i+=2){ x+=e.p[i]; y+=e.p[i+1]; } x/=e.p.length/2; y/=e.p.length/2;
+    if(enArea(x,y)&&!enVerde(x,y)) cand.push([x,y,e.n]); });
+  cand.sort((a,b)=>dC(a[0],a[1])-dC(b[0],b[1]));
   const TI=SITIOS.tienda; // deja libre el frente de la tienda, donde están las cosas para comprar
-  for(const [x,y] of cand){ if(n>=VECINOS.length) break; if(dC(x,y)<25||!separado(x,y,18)||(TI&&Math.hypot(x-TI.x,y-TI.y-13)<30)) continue;
-    if(Object.values(SITIOS).some(s=>s.t==='vecino'&&Math.hypot(s.x-x,s.y-y)<40)) continue; poner('v'+n,'vecino',x,y,n); n++; } }
+  const libre=(x,y)=>dC(x,y)>=25&&separado(x,y,18)&&!(TI&&Math.hypot(x-TI.x,y-TI.y-13)<30)&&!Object.values(SITIOS).some(s=>s.t==='vecino'&&Math.hypot(s.x-x,s.y-y)<40);
+  let n=0, g=0;
+  for(const [x,y,pisos] of cand){ if(n>=VECINOS.length) break; if(pisos>3||!libre(x,y)) continue; poner('v'+n,'vecino',x,y,n); n++; }
+  for(const [x,y,pisos] of cand){ if(g>=EDIFICIOS_NOM.length) break; if(pisos<5||!libre(x,y)) continue; poner('e'+g,'vecino',x,y,g); SITIOS['e'+g].grande=pisos; g++; } }
 const LISTA=Object.values(SITIOS);
 
 // ======================= LA SECUENCIA DE CONSTRUCCIÓN =======================
@@ -181,9 +202,9 @@ const proximos=()=>{ const r=[]; for(let i=0;i<SEQ.length&&r.length<2;i++) if(!S
 // La tienda: siempre muestra lo siguiente que se puede comprar de cada cosa
 const PRECIO_CARRITO=[0,150,900], PRECIO_BICI=300, PRECIO_SOMBRERO={gorra:120,paja:300,vueltiao:700}, ICO_SOMBRERO={gorra:'🧢',paja:'👒',vueltiao:'🎩'};
 function padsTienda(){ if(!hecho('tienda')) return []; const r=[], n=(S.carrito||0)+1;
-  if(n<CAPACIDAD.length) r.push({k:'tc'+n,tipo:'carrito',n,costo:PRECIO_CARRITO[n],...enTienda(-13),ico:'🛒'});
-  if(!S.bici) r.push({k:'tb',tipo:'bici',costo:PRECIO_BICI,...enTienda(0),ico:'🚲'});
-  const h=SOMBREROS.find(o=>!S.sombreros[o.id]); if(h) r.push({k:'ts'+h.id,tipo:'sombrero',h:h.id,costo:PRECIO_SOMBRERO[h.id],...enTienda(13),ico:ICO_SOMBRERO[h.id]});
+  if(n<CAPACIDAD.length) r.push({k:'tc'+n,tipo:'carrito',corto:'CARRITO',n,costo:PRECIO_CARRITO[n],...enTienda(-13),ico:'🛒'});
+  if(!S.bici) r.push({k:'tb',tipo:'bici',corto:'BICI',costo:PRECIO_BICI,...enTienda(0),ico:'🚲'});
+  const h=SOMBREROS.find(o=>!S.sombreros[o.id]); if(h) r.push({k:'ts'+h.id,tipo:'sombrero',corto:'SOMBRERO',h:h.id,costo:PRECIO_SOMBRERO[h.id],...enTienda(13),ico:ICO_SOMBRERO[h.id]});
   return r; }
 const pads=()=>proximos().map(i=>({k:i,...SEQ[i]})).concat(padsTienda());
 // Qué es cada cosa que se puede construir o comprar
@@ -191,7 +212,7 @@ function infoPad(p){ const s=p.s&&SITIOS[p.s];
   if(p.tipo==='construir') return {paca:['Paca digestora','Echa aquí los orgánicos. Cuando se llena, da flores y tierra.'],
     huerta:['Huerta comunitaria','Trae tierra de las pacas para sembrar, y cosecha.'],
     rec:['Reciclador','Te compra el reciclaje que le lleves.'],
-    vecino:['Casa de '+(s?VECINOS[s.i%VECINOS.length][0]:''),'Saca bolsas cada día y te paga por recogerlas.'],
+    vecino:[s&&s.grande?nombreVecino(s):'Casa de '+(s?nombreVecino(s):''),s&&s.grande?'Un edificio de '+s.grande+' pisos: saca muchísimas bolsas y paga por recogerlas.':'Saca bolsas cada día y te paga por recogerlas.'],
     tienda:['Tienda del barrio','Vende carritos, bicicleta y sombreros.']}[s.t];
   if(p.tipo==='nivel'){ const paca_=s.t==='paca';
     return ['Mejorar '+(paca_?'paca':'huerta')+' a nivel '+(p.n+1),'Crece más rápido y da más. '+(paca_?(p.n===1?'Caben 2 flores y salen flores nuevas.':'Salen las flores más valiosas.'):(p.n===1?'Se puede sembrar fresa y tomate.':'Se puede sembrar maíz y ahuyama.'))]; }
@@ -199,7 +220,7 @@ function infoPad(p){ const s=p.s&&SITIOS[p.s];
   if(p.tipo==='bici') return ['Bicicleta de carga','Te mueves mucho más rápido.'];
   if(p.tipo==='sombrero') return [SOMBREROS.find(o=>o.id===p.h).n,'Para verte bien en el barrio.'];
   return ['Abrir más barrio','Llegas a calles nuevas con más vecinos, pacas y huertas.']; }
-const NOMBRE_SITIO=s=>({casa:'TU CASA',tienda:'TIENDA',rec:'RECICLADOR',paca:'PACA',huerta:'HUERTA',casera:'HUERTA CASERA',vecino:(VECINOS[s.i%VECINOS.length]||[''])[0].toUpperCase()})[s.t];
+const NOMBRE_SITIO=s=>({casa:'TU CASA',tienda:'TIENDA',rec:'RECICLADOR',paca:'PACA',huerta:'HUERTA',casera:'HUERTA CASERA',vecino:nombreVecino(s).toUpperCase()})[s.t];
 
 // Estado de cada sitio (se crea cuando se construye)
 const paca=id=>S.pacas[id]||(S.pacas[id]={kg:0,s:[],tierra:0});
@@ -330,7 +351,7 @@ function update(dt){
   if(nocheCamion()&&!avisoCamion&&hora()>.5){ avisoCamion=true; toast('🚛 Esta noche pasa el camión: deja tu casa sin bolsas'); }
   // la casa y los vecinos van sacando bolsas a lo largo del día
   S.gen+=dt; while(S.gen>=DIA/PATRON.length){ S.gen-=DIA/PATRON.length; const t=PATRON[(S.genI=(S.genI||0)+1)%PATRON.length]; S.casa[t]++; S.mes.gen++; }
-  S.genV+=dt; while(S.genV>=DIA/VECINO_DIA){ S.genV-=DIA/VECINO_DIA; LISTA.forEach(s=>{ if(s.t==='vecino'&&hecho(s.id)){ const v=vecino(s.id); v.n=Math.min(VECINO_TOPE,v.n+1); } }); }
+  S.genV+=dt; while(S.genV>=DIA/VECINO_DIA){ S.genV-=DIA/VECINO_DIA; LISTA.forEach(s=>{ if(s.t==='vecino'&&hecho(s.id)){ const v=vecino(s.id); v.n=Math.min(VECINO_TOPE*(s.grande?2:1),v.n+(s.grande?2:1)); } }); }
   for(const id in S.pacas){ const p=S.pacas[id]; p.s.forEach(x=>{ if(x.t<FLORES[x.f].seg) x.t+=dt*NIVELES[nivelDe(id)].vel; }); }
   for(const id in S.huertas){ const h=S.huertas[id]; if(h.c>=0&&h.t<CULTIVOS[h.c].seg) h.t+=dt*NIVELES[nivelDe(id)].vel; }
   // movimiento: joystick o teclas
@@ -368,11 +389,11 @@ function estrellas(x,y,n){ for(let i=0;i<n;i++){ const ex=x-n*7+i*14; ctx.fillSt
 function fantasma(s,x,y){ ctx.globalAlpha=.38;
   if(s.t==='paca') ctx.drawImage(PACA[0],x-33,y-40,66,48); else if(s.t==='huerta') ctx.drawImage(HUERTA,x-33,y-34,66,42);
   else if(s.t==='rec'){ ctx.drawImage(CARRETA,x+6,y-34,48,36); ctx.drawImage(persona(RECI,'down',0),x-22,y-52,36,51); }
-  else if(s.t==='vecino') ctx.drawImage(CASAS_VEC[s.i%CASAS_VEC.length],x-39,y-70,78,78); else if(s.t==='tienda') ctx.drawImage(TIENDA,x-45,y-70,90,78);
+  else if(s.t==='vecino'){ const [im,w,h]=dibujoVecino(s); ctx.drawImage(im,x-w/2,y-h+8,w,h); } else if(s.t==='tienda') ctx.drawImage(TIENDA,x-45,y-70,90,78);
   ctx.globalAlpha=1; }
 function dibujarPad(p){ const i=p.k, x=X(p.x), y=Y(p.y), f=p.costo?Math.min(1,(S.pagado[i]||0)/p.costo):Math.min(1,-(S.pagado[i]||0)/.35), enc=Math.hypot(p.x-pl.x,p.y-pl.y)<4.5;
   if(p.tipo==='construir') fantasma(SITIOS[p.s],x,y-4);
-  etiquetaTexto(infoPad(p)[0].toUpperCase(),x,y-(p.tipo==='construir'?78:30),7,'#ffe27a');
+  etiquetaTexto(p.corto||infoPad(p)[0].toUpperCase(),x,y-(p.tipo==='construir'?78:30),7,'#ffe27a');
   if(p.tipo==='construir'){ ctx.setLineDash([8,6]); ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.beginPath(); ctx.roundRect(x-40,y-34,80,44,10); ctx.stroke(); ctx.setLineDash([]); }
   const s=enc?40:36; ctx.save(); ctx.translate(x,y);
   ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.roundRect(-s/2+2,-s/2+4,s,s,8); ctx.fill();
@@ -388,9 +409,9 @@ function dibujarSitio(s){ const f=dibujarSitio_(s); if(Math.hypot(s.x-pl.x,s.y-p
 function dibujarSitio_(s){ const x=X(s.x), y=Y(s.y), id=s.id;
   if(s.t==='casa'){ ctx.drawImage(CASA,x-39,y-66,78,78); const nb=Math.min(6,S.casa.b); for(let k=0;k<nb;k++) ctx.drawImage(ICON.b,x+36+(k%3)*12,y-10-Math.floor(k/3)*12,14,16);
     const n=S.casa.o+S.casa.r; if(n) return ()=>globo(x,y-80,S.casa.o?ICON.o:ICON.r,n); return; }
-  if(s.t==='vecino'){ const v=vecino(id); ctx.drawImage(CASAS_VEC[s.i%CASAS_VEC.length],x-39,y-66,78,78);
+  if(s.t==='vecino'){ const v=vecino(id), [im,w,h]=dibujoVecino(s); ctx.drawImage(im,x-w/2,y-h+12,w,h);
     for(let k=0;k<Math.min(6,v.n);k++) ctx.drawImage(k%2?ICON.o:ICON.r,x+36+(k%3)*12,y-10-Math.floor(k/3)*12,14,16);
-    if(v.n) return ()=>globo(x,y-80,ICON.o,v.n); return; }
+    if(v.n) return ()=>globo(x,y-(s.grande?122:80),ICON.o,v.n); return; }
   if(s.t==='tienda'){ ctx.drawImage(TIENDA,x-45,y-66,90,78); return; }
   if(s.t==='casera'){ const c=casera(id); ctx.drawImage(HUERTA,x-22,y-20,44,28); ctx.fillStyle='#e9d9b0'; for(let k=0;k<5;k++) ctx.fillRect(x-24+k*12,y+4,3,8); ctx.fillRect(x-24,y+6,51,2);
     if(c.pide&&lleva('t')) return ()=>globo(x,y-38,ICON.t,c.pide); return; }
@@ -534,26 +555,16 @@ cv.addEventListener('pointerup',soltarJoy); cv.addEventListener('pointercancel',
 const cardOv=$('cardOv'), albumOv=$('albumOv'); let current=null;
 const count=()=>ESPECIES.filter(e=>S.found[e.nombre]).length;
 function cerrarFichas(){ cardOv.style.display='none'; albumOv.style.display='none'; paused=false; current=null; for(const k in keys) keys[k]=false; }
+// Al tocar un árbol se ve su dibujo y, si es nuevo, se suma a la colección de especies
 function openCard(e,altura){ current=e; paused=true; joy=null; albumOv.style.display='none';
+  const nueva=!S.found[e.nombre]; if(nueva){ S.found[e.nombre]={date:new Date().toLocaleDateString('es')}; persist(); }
   beads(grande(e),$('cardSprite')); $('cardName').textContent=e.nombre.toUpperCase(); $('cardSci').textContent=e.spec.sci||'';
   $('cardFact').textContent=(e.cuantos===1?'Es el único de su especie en el barrio.':'Hay '+e.cuantos+' en el barrio.')+(altura?' Este mide unos '+altura+' m.':'');
-  const rec=S.found[e.nombre], img=$('cardPhoto');
-  if(rec&&rec.photo){ img.src=rec.photo; img.style.display='block'; } else img.style.display='none';
-  $('cardStatus').textContent=rec?'✔ Registrado el '+rec.date:'';
-  $('btnFoto').textContent=rec?(rec.photo?'CAMBIAR FOTO':'AÑADIR FOTO'):'REGISTRAR CON FOTO';
-  $('btnReg').style.display=rec?'none':'block'; cardOv.style.display='flex'; $('card').scrollTop=0; }
-function register(e,photo){ const isNew=!S.found[e.nombre], prev=S.found[e.nombre]||{};
-  S.found[e.nombre]={date:prev.date||new Date().toLocaleDateString('es'),photo:photo||prev.photo||null}; persist(); openCard(e);
-  if(isNew) toast('🌳 ¡'+e.corto+' registrado! Llevas '+count()+' de '+ESPECIES.length); }
-$('btnReg').onclick=()=>current&&register(current,null);
-$('btnFoto').onclick=()=>$('file').click();
+  $('cardStatus').textContent=nueva?'✨ ¡Nueva especie! Llevas '+count()+' de '+ESPECIES.length:'✔ Ya está en tu colección';
+  $('btnClose').textContent=nueva?'¡GENIAL!':'CERRAR'; cardOv.style.display='flex'; $('card').scrollTop=0; }
 $('btnClose').onclick=cerrarFichas;
-$('file').onchange=ev=>{ const file=ev.target.files[0], e=current; ev.target.value=''; if(!file||!e) return;
-  const img=new Image(); img.onload=()=>{ const c=document.createElement('canvas'); c.width=c.height=56; const g=c.getContext('2d');
-    const s=Math.min(img.width,img.height); g.drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,56,56); URL.revokeObjectURL(img.src); register(e,c.toDataURL('image/png')); };
-  img.src=URL.createObjectURL(file); };
 function openAlbum(){ cardOv.style.display='none'; paused=true; joy=null;
-  $('albumSub').textContent=count()+' de '+ESPECIES.length+' especies registradas · toca un árbol en el mapa para verlo';
+  $('albumSub').textContent=count()+' de '+ESPECIES.length+' especies en tu colección · toca un árbol en el mapa para sumarlo';
   const grid=$('grid'); grid.innerHTML='';
   ESPECIES.forEach(e=>{ const ok=!!S.found[e.nombre], d=document.createElement('div'); d.className='cell'+(ok?'':' no');
     if(ok){ const c=document.createElement('canvas'); beads(grande(e),c); d.appendChild(c); d.appendChild(document.createTextNode(e.corto)); d.onclick=()=>openCard(e); }
