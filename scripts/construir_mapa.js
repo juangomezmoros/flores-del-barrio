@@ -142,6 +142,7 @@ const mapa = {
   area: plana(area), calles, rotulos,
   edificios: edificios.map(e => ({ p: plana(e.pts), n: e.n, u: e.u })), agua, parques: parques.map(q => ({ n: q.n, p: plana(q.pts) })),
   verdes: verdes.map(v => ({ n: v.n, p: plana(v.pts) })), calzadas: calzadas.map(plana), andenes: andenes.map(plana),
+  manzanas: manzanas.filter(m => visible(m.pts)).map(m => ({ p: plana(m.pts), u: m.u })),
   especies, arboles, huertas: plana(huertas), casa: plana([casa]), zonasPaca: plana(zonasPaca), huertasCom: plana(huertasCom), recicladores: plana(recicladores),
 };
 fs.writeFileSync(path.join(DATA, 'mapa.js'), '// Generado por scripts/construir_mapa.js: no editar a mano\nwindow.MAPA=' + JSON.stringify(mapa) + ';\n');

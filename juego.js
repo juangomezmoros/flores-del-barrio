@@ -62,7 +62,8 @@ const anchos=[...new Set(MAPA.calles.filter(c=>!c.s).map(c=>c.a))].sort((a,b)=>a
 const CALLES=anchos.map(a=>({a,q:junta(MAPA.calles.filter(c=>!c.s&&c.a===a).map(c=>c.p))}));
 const SENDEROS=junta(MAPA.calles.filter(c=>c.s).map(c=>c.p));
 const USO_COLOR={R:'#eadcc0',C:'#f1c7a3',D:'#cfd9ea',B:'#d9d2c4',O:'#e2dacb'};
-const EDIFICIOS=Object.keys(USO_COLOR).map(u=>({u,q:junta(MAPA.edificios.filter(e=>e.u===u).map(e=>e.p),true)}));
+// Se dibuja cada manzana como un solo bloque del color de su uso (sin las divisiones entre predios)
+const MANZANAS=Object.keys(USO_COLOR).map(u=>({u,q:junta((MAPA.manzanas||[]).filter(m=>m.u===u).map(m=>m.p),true)}));
 const PARQUES=junta(MAPA.parques.map(p=>p.p).concat((MAPA.verdes||[]).map(v=>v.p)),true);
 const CALZADAS=junta(MAPA.calzadas||[],true), ANDENES=junta(MAPA.andenes||[],true);
 const AGUA_POL=junta(MAPA.agua.filter(a=>a.pol).map(a=>a.p),true), AGUA_LIN=MAPA.agua.filter(a=>!a.pol).map(a=>({a:a.a,q:trazo(a.p)}));
@@ -76,13 +77,13 @@ const enVerde=(x,y)=>ZONAS_VERDES.some(v=>x>=v.b[0]&&x<=v.b[2]&&y>=v.b[1]&&y<=v.
 
 function dibujarMapa(g,escala,ox,oy){
   g.save(); g.setTransform(escala,0,0,escala,-ox,-oy);
+  MANZANAS.forEach(m=>{ g.fillStyle=USO_COLOR[m.u]; g.fill(m.q); });
   g.fillStyle='#bfe3a0'; g.fill(PARQUES); g.fillStyle='#e7e0cf'; g.fill(ANDENES);
   g.fillStyle='#9fd3f0'; g.fill(AGUA_POL); g.strokeStyle='#9fd3f0'; g.lineCap=g.lineJoin='round';
   AGUA_LIN.forEach(a=>{ g.lineWidth=a.a; g.stroke(a.q); });
   g.strokeStyle='#cfc3a4'; CALLES.forEach(c=>{ g.lineWidth=c.a+3.2; g.stroke(c.q); });
   g.strokeStyle='#fffdf6'; CALLES.forEach(c=>{ g.lineWidth=c.a; g.stroke(c.q); }); g.fillStyle='#fffdf6'; g.fill(CALZADAS);
   g.strokeStyle='#e3cf9c'; g.lineWidth=1.6; g.setLineDash([2.5,2]); g.stroke(SENDEROS); g.setLineDash([]);
-  g.strokeStyle='#c9b48c'; g.lineWidth=.5; EDIFICIOS.forEach(e=>{ g.fillStyle=USO_COLOR[e.u]; g.fill(e.q); g.stroke(e.q); });
   g.fillStyle='rgba(40,60,48,.55)'; g.fill(FUERA,'evenodd');
   g.restore();
 }
